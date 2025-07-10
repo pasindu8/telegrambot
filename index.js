@@ -1,28 +1,28 @@
 const TelegramBot = require('node-telegram-bot-api');
 const admin = require('firebase-admin');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { v4: uuidv4 } = require('uuid'); // For unique ID generation
-const fs = require('fs').promises; // For async file system operations
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs').promises;
 const path = require('path');
-const os = require('os'); // For temporary directory
-const crypto = require('crypto'); // For random PIN generation
+const os = require('os'); 
+const crypto = require('crypto'); 
 
-// --- Bot Configuration ---
-const BOT_TOKEN = process.env.BOT_TOKEN; // Reads from Vercel Environment Variables
+
+const BOT_TOKEN = process.env.BOT_TOKEN; 
 const SEND_MESSAGE_API_URL = "https://typical-gracia-pdbot-aed22ab6.koyeb.app/send-message";
 
 const bot = new TelegramBot(BOT_TOKEN);
 
-// --- Logger (simple console logs for serverless functions) ---
+
 const logger = {
     info: (...args) => console.log('INFO:', ...args),
     warn: (...args) => console.warn('WARN:', ...args),
     error: (...args) => console.error('ERROR:', ...args),
 };
 
-// --- Firebase Initialization ---
+
 let db;
-let bucket; // For Firebase Storage, though not fully implemented in Python code
+let bucket; 
 
 const firebaseServiceAccountKeyJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
@@ -31,11 +31,10 @@ if (firebaseServiceAccountKeyJson) {
         const serviceAccount = JSON.parse(firebaseServiceAccountKeyJson);
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            // Add storageBucket if you plan to use Firebase Storage
-            // storageBucket: 'your-firebase-project-id.appspot.com' // e.g., filesharebot-69436.appspot.com
+          
         });
         db = admin.firestore();
-        // bucket = admin.storage().bucket(); // Initialize storage bucket if needed
+      
         logger.info("Firebase initialized successfully.");
     } catch (e) {
         logger.error(`Failed to initialize Firebase: ${e.message}`);
@@ -46,9 +45,9 @@ if (firebaseServiceAccountKeyJson) {
     db = null;
 }
 
-// --- Gemini AI Initialization ---
+
 let geminiModel;
-const geminiApiKey = process.env.GEMINI_API_KEY; // Reads from Vercel Environment Variables
+const geminiApiKey = process.env.GEMINI_API_KEY; 
 
 if (geminiApiKey) {
     try {
@@ -64,29 +63,25 @@ if (geminiApiKey) {
     geminiModel = null;
 }
 
-// Firestore Collection Path (Public data for file metadata)
+
 const APP_ID = "telegram_bot_app";
 const FILES_COLLECTION_PATH = `artifacts/${APP_ID}/public/data/files`;
 const FILES_COLLECTION = db ? db.collection(FILES_COLLECTION_PATH) : null;
 
-// --- Conversation States (Manual Management) ---
-// Using a Map to store user states for multi-step conversations
-// WARNING: This is an in-memory map. State will be lost if the Vercel function
-// spins down and up. For persistent state, consider a database like Redis.
 const userStates = new Map();
 
 const STATES = {
     NONE: 'none',
     SENDMSG_ASK_NUMBER: 'sendmsg_ask_number',
     SENDMSG_ASK_MESSAGE: 'sendmsg_ask_message',
-    YT_ASK_URL: 'yt_ask_url', // This functionality will be noted as unavailable
+    YT_ASK_URL: 'yt_ask_url', 
     UPLOAD_WAIT_FILE: 'upload_wait_file',
     GETFILE_ASK_PIN: 'getfile_ask_pin',
     AI_ASK_QUERY: 'ai_ask_query',
     DOWNLOAD_ASK_URL: 'download_ask_url',
 };
 
-// --- Helper Functions ---
+
 function generatePin(length = 6) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
@@ -106,7 +101,7 @@ async function isPinUnique(pin) {
         return !doc.exists;
     } catch (e) {
         logger.error(`Error checking PIN uniqueness: ${e.message}`);
-        return false; // Assume not unique on error to prevent duplicates
+        return false; 
     }
 }
 
@@ -116,11 +111,11 @@ async function generateUniquePin(length = 6) {
         if (await isPinUnique(pin)) {
             return pin;
         }
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+        await new Promise(resolve => setTimeout(resolve, 100)); 
     }
 }
 
-// --- Send Message API Function ---
+
 async function sendMessageViaApi(number, messageText) {
     logger.info(`Attempting to send message to number: ${number} with text: ${messageText.substring(0, 50)}...`);
     const payload = { number, message: messageText };
@@ -131,7 +126,7 @@ async function sendMessageViaApi(number, messageText) {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(payload),
-            timeout: 20000 // 20 seconds timeout
+            timeout: 20000 
         });
 
         if (!response.ok) {
@@ -154,10 +149,10 @@ async function sendMessageViaApi(number, messageText) {
     }
 }
 
-// --- AI API Function ---
+
 async function askGeminiAi(query) {
     if (!geminiModel) {
-        return "AI සේවාව ලබා ගත නොහැක. කරුණාකර පසුව උත්සාහ කරන්න.";
+        return "AI service is unavailable. Please try again later.";
     }
 
     logger.info(`Asking AI: ${query.substring(0, 100)}...`);
@@ -167,13 +162,13 @@ async function askGeminiAi(query) {
         return response.text();
     } catch (e) {
         logger.error(`Error calling Gemini AI: ${e.message}`);
-        return "AI ප්‍රතිචාරයක් ලබාගැනීමේ දෝෂයක් සිදුවිය. කරුණාකර පසුව උත්සාහ කරන්න.";
+        return "There was an error retrieving AI response. Please try again later.";
     }
 }
 
-// --- External URL Download Function ---
+
 async function downloadFileFromUrl(url, chatId) {
-    await bot.sendMessage(chatId, 'File එක download කරමින් සිටී. කරුණාකර මොහොතක් රැඳී සිටින්න...');
+    await bot.sendMessage(chatId, 'The file is downloading. Please wait a moment...');
     logger.info(`Attempting to download file from URL: ${url}`);
 
     let tempDir;
@@ -216,21 +211,21 @@ async function downloadFileFromUrl(url, chatId) {
         if (fileSize > TELEGRAM_FILE_LIMIT) {
             await bot.sendMessage(
                 chatId,
-                `File එක (${(fileSize / (1024 * 1024)).toFixed(2)} MB) Telegram හරහා කෙලින්ම යැවීමට විශාල වැඩියි. කරුණාකර වෙනත් download ක්‍රමයක් භාවිතා කරන්න.`
+                `File එක (${(fileSize / (1024 * 1024)).toFixed(2)} MB) Too large to send directly via Telegram. Please use another download method.`
             );
             logger.warn(`File too large for direct Telegram upload: ${url} (${(fileSize / (1024 * 1024)).toFixed(2)} MB)`);
             return;
         }
 
-        await bot.sendMessage(chatId, 'File එක යවමින් සිටී...');
-        await bot.sendDocument(chatId, filePath, { caption: `ඔබගේ file එක: ${filename}` });
-        await bot.sendMessage(chatId, '✅ **File එක සාර්ථකව යවන ලදී!**');
+        await bot.sendMessage(chatId, 'Sending file...');
+        await bot.sendDocument(chatId, filePath, { caption: `Your file: ${filename}` });
+        await bot.sendMessage(chatId, '✅ **File sent successfully!**');
 
     } catch (e) {
         logger.error(`Error downloading file from URL ${url}: ${e.message}`);
         await bot.sendMessage(
             chatId,
-            `❌ File එක download කිරීමේ දෝෂයක් සිදුවිය: ${e.message}. කරුණාකර URL එක නිවැරදිදැයි පරීක්ෂා කරන්න.`
+            `❌ An error occurred while downloading the file: ${e.message}. Please check if the URL is correct.`
         );
     } finally {
         if (tempDir) {
@@ -476,11 +471,11 @@ bot.on('message', async (msg) => {
         if (command === '/start') {
             await bot.sendMessage(
                 chatId,
-                'ආයුබෝවන්! මම ඔබට දුරකථන අංකයකට message යැවීමට, ' +
+                'ආයුබෝවන්!' +
                 'ඕනෑම URL එකකින් files download කිරීමට, AI සමඟ කතා කිරීමට, ' +
                 'සහ files upload කර PIN එකකින් නැවත download කිරීමට උදව් කරන bot කෙනෙක්. \n\n' +
                 'Commands:\n' +
-                '/sendmsg - දුරකථන අංකයකට message එකක් යවන්න.\n' +
+                '\n' +
                 '/yt_download - YouTube video එකක් download කරන්න. (දැනට නොමැත)\n' +
                 '/download_url - ඕනෑම URL එකකින් file එකක් download කරන්න.\n' +
                 '/upload_file - File එකක් upload කර PIN එකක් ලබාගන්න.\n' +
