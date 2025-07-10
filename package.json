@@ -1,12 +1,19 @@
 {
-  "name": "file-to-link-bot",
+  "name": "telegram-bot",
   "version": "1.0.0",
-  "description": "My Telegram Bot",
+  "description": "A Telegram bot for file sharing, AI, and messaging.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.61.0" 
-  }
+    "node-telegram-bot-api": "^0.66.0",
+    "firebase-admin": "^12.3.0",
+    "@google/generative-ai": "^0.15.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "author": "Your Name",
+  "license": "ISC"
 }
