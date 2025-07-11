@@ -116,7 +116,7 @@ async function generateUniquePin(length = 6) {
         if (await isPinUnique(pin)) {
             return pin;
         }
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+        await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
     }
 }
 
